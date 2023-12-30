@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract PowerUpToken is ERC20, Ownable, ERC20Burnable, Pausable {
+    event PowerUpRedeemed(address indexed account, uint8 powerUp, uint256 powerUpCost);
+    event PowerUpBalanceChecked(address indexed account, uint8 powerUp, uint256 balance);
+    event TotalSupplyChecked(uint256 totalSupply);
+    event TokenSymbolChecked(string symbol);
+    event TokenPaused(address account);
+    event TokenUnpaused(address account);
+    event TokensTransferred(address indexed from, address indexed to, uint256 value);
+
+    mapping(address => uint8) public userSelectedPowerUps;
+    mapping(uint8 => uint256) public powerUpCosts;
+
+    // Set the initial owner address
+    constructor() ERC20("PowerUpToken", "PUT") Ownable(msg.sender) {
+        // Default power-up costs
+        powerUpCosts[1] = 15; // Cost of "Health Boost"
+        powerUpCosts[2] = 20; // Cost of "Speed Boost"
+        powerUpCosts[3] = 30; // Cost of "Strength Boost"
+        powerUpCosts[4] = 40; // Cost of "Invisibility"
+    }
+
+    function mint_tokens(address to, uint256 count) external onlyOwner {
+        _mint(to, count);
+    }
+
+    function burn_tokens(uint256 count) external {
+        require(count > 0, "The count of tokens to destroy must be greater than zero");
+        require(balanceOf(msg.sender) >= count, "Insufficient funds for power-up destruction");
+        _burn(msg.sender, count);
+    }
+
+    function redeemPowerUp(uint8 powerUpNumber) external whenNotPaused {
+        require(powerUpNumber >= 1 && powerUpNumber <= 4, "Invalid power-up number");
+
+        uint256 powerUpCost = powerUpCosts[powerUpNumber];
+
+        require(balanceOf(msg.sender) >= powerUpCost, "Insufficient funds for power-up redemption");
+        _burn(msg.sender, powerUpCost);
+
+        userSelectedPowerUps[msg.sender] = powerUpNumber;
+        emit PowerUpRedeemed(msg.sender, powerUpNumber, powerUpCost);
+    }
+
+    function checkPowerUpBalance(address account, uint8 powerUp) external view returns (uint256) {
+        require(powerUp >= 1 && powerUp <= 4, "Invalid power-up number");
+        return balanceOf(account);
+    }
+
+    function checkTotalSupply() external view returns (uint256) {
+        return totalSupply();
+    }
+
+    function checkTokenSymbol() external view returns (string memory) {
+        return symbol();
+    }
+
+    function pauseToken() external onlyOwner {
+        _pause();
+        emit TokenPaused(msg.sender);
+    }
+
+    function unpauseToken() external onlyOwner {
+        _unpause();
+        emit TokenUnpaused(msg.sender);
+    }
+
+    function transferTokens(address to, uint256 value) external whenNotPaused {
+        _transfer(msg.sender, to, value);
+        emit TokensTransferred(msg.sender, to, value);
+    }
+}
